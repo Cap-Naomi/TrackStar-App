@@ -15,6 +15,7 @@
       }
     },
     "android": {
+      "package": "com.trackstar.app",
       "adaptiveIcon": {
         "backgroundColor": "#080A09",
         "foregroundImage": "./assets/android-icon-foreground.png",

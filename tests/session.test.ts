@@ -30,4 +30,31 @@ describe('RunSessionEngine', () => {
     engine.resume(8000);
     expect(engine.tick(10000).elapsedSec).toBe(7);
   });
+
+  it('does not claim a beat match when Spotify BPM is unknown', () => {
+    const spotifyTrack: Track = {
+      id: 'spotify-a',
+      title: 'Spotify A',
+      artist: 'T',
+      bpm: null,
+      genres: ['anything'],
+      durationMs: 1000,
+      familiarityScore: 1,
+      artworkColors: ['#000', '#111'],
+      source: 'spotify',
+    };
+    const engine = new RunSessionEngine(plan, [spotifyTrack], undefined, () => 0);
+
+    engine.start(0);
+    const snapshot = engine.updateCadence({
+      timestampMs: 1000,
+      rawSpm: 145,
+      smoothedSpm: 145,
+      confidence: 1,
+      source: 'simulation',
+    });
+
+    expect(snapshot.trackMatch.mode).toBe('unknown');
+    expect(snapshot.beatMatchPercent).toBeNull();
+  });
 });

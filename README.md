@@ -22,9 +22,11 @@ TrackStar uses Spotify's Authorization Code with PKCE flow. No client secret bel
 3. For local web development, open the app at `http://127.0.0.1:8081` and allowlist `http://127.0.0.1:8081/callback`; Spotify does not accept `localhost` redirect URIs. For a deployed web app, allowlist its exact HTTPS `/callback` URL and set `EXPO_PUBLIC_SPOTIFY_REDIRECT_URI` to that URL.
 4. Create/rebuild an Expo development build after adding the native URL scheme, then start the app.
 
-Spotify development-mode apps currently require the owner to have Premium and allow up to five allowlisted users. Add each tester in the Spotify dashboard. After authorization, TrackStar stores native refresh tokens in SecureStore, fetches the user's profile, top tracks, and saved tracks, and uses that personalized catalog for soundtrack selections. Web builds use browser storage and should be served only over HTTPS.
+Spotify OAuth cannot be tested inside Expo Go because Expo Go cannot own TrackStar's callback scheme. On Android, use the HTTPS web build in Chrome or install a development build; scanning the project into Expo Go will keep the rest of the demo working but Spotify sign-in is intentionally disabled.
 
-Spotify recordings are not downloaded or streamed by TrackStar. The Spotify button opens the selected licensed recording in Spotify, while TrackStar's original beat loop provides in-app cadence feedback.
+Spotify development-mode apps currently require the owner to have Premium and allow up to five allowlisted users. Add each tester in the Spotify dashboard. After authorization, TrackStar stores native refresh tokens in SecureStore, fetches the user's profile, top tracks, and saved tracks, and uses that personalized catalog for soundtrack selections. It requests `user-read-playback-state` and `user-modify-playback-state` so the run controls can operate an available Spotify Connect device. Web builds use browser storage and should be served only over HTTPS.
+
+Spotify recordings are not downloaded or streamed by TrackStar. With Spotify connected, the run controls start, pause, and switch tracks on an available Spotify app, Web Player, or Spotify Connect device. Open Spotify on at least one device before starting a run. Spotify playback control requires Premium. Without Spotify, TrackStar uses its original bundled cadence loops.
 
 Useful commands:
 
@@ -34,6 +36,17 @@ pnpm test
 pnpm lint
 pnpm exec expo export --platform android
 ```
+
+## Android development APK
+
+This project includes `expo-dev-client` and an EAS `development` profile that produces an installable APK. Sign in to Expo and launch the cloud build with:
+
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest build --platform android --profile development
+```
+
+After installing the APK, run `pnpm start` and open the TrackStar development client rather than Expo Go. The development client owns `trackstar-spotify://callback`, which must be registered exactly in the Spotify developer dashboard.
 
 ## 60-second demo script
 
@@ -56,7 +69,7 @@ For a physical demonstration, choose **Real sensor**, grant Motion permission, k
 - Offline generated audio loops at 145, 164, 172, and 178 BPM
 - Pause, skip, early end, haptic interval transitions, and sensor cleanup
 - Persisted profile, workout, cadence source, and recent summaries
-- Spotify PKCE sign-in with profile, top-track, and saved-library sync
+- Spotify PKCE sign-in with profile, library sync, and Spotify Connect playback control
 - Beat Match, time-in-target, consistency, step estimate, and timeline analytics
 - Unit coverage for cadence, matching, coaching, analytics, and session timing
 

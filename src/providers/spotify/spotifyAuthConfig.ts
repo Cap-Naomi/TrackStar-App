@@ -23,6 +23,12 @@ export function resolveSpotifyRedirectUri(
   return configured;
 }
 
+export function supportsSpotifyOAuthRedirect(redirectUri: string): boolean {
+  // Expo Go owns the exp:// scheme, so an OAuth provider cannot redirect to
+  // this project specifically. A development build owns the configured scheme.
+  return !/^exp:\/\//i.test(redirectUri);
+}
+
 export function publishSpotifyWebCallback(
   callbackUrl: string,
   storage: Pick<Storage, 'setItem'>,

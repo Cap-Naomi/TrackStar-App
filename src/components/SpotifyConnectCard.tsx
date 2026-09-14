@@ -5,7 +5,7 @@ import { useSpotifyAuth } from '@/providers/spotify/SpotifyAuthProvider';
 import { useSpotifyStore } from '@/stores/spotifyStore';
 
 export function SpotifyConnectCard() {
-  const { configured, connect, disconnect, sync } = useSpotifyAuth();
+  const { configured, authSupported, connect, disconnect, sync } = useSpotifyAuth();
   const { status, profile, tracks, error } = useSpotifyStore();
   const busy = status === 'connecting' || status === 'syncing';
   const connected = Boolean(profile);
@@ -17,7 +17,7 @@ export function SpotifyConnectCard() {
         <View style={styles.copy}>
           <Text style={styles.eyebrow}>{connected ? 'SPOTIFY CONNECTED' : 'YOUR MUSIC'}</Text>
           <Text numberOfLines={1} style={styles.title}>{connected ? profile?.displayName : 'Bring your favorites'}</Text>
-          <Text style={styles.body}>{connected ? `${tracks.length} top and saved tracks ready for your runs.` : 'Sign in to use your top and saved songs in every run.'}</Text>
+          <Text style={styles.body}>{connected ? `${tracks.length} top and saved tracks ready for your runs.` : authSupported ? 'Sign in to use your top and saved songs in every run.' : 'Spotify OAuth cannot return to a project running inside Expo Go.'}</Text>
         </View>
         {connected ? <Ionicons name="checkmark-circle" size={22} color={colors.spotify} /> : null}
       </View>
@@ -37,10 +37,10 @@ export function SpotifyConnectCard() {
       ) : (
         <Pressable disabled={busy} onPress={() => void connect()} style={({ pressed }) => [styles.connectButton, pressed && styles.pressed, busy && styles.disabled]}>
           {busy ? <ActivityIndicator color="#07150C" /> : <FontAwesome name="spotify" size={19} color="#07150C" />}
-          <Text style={styles.connectLabel}>{busy ? 'CONNECTING…' : configured ? 'Sign in with Spotify' : 'Configure Spotify sign-in'}</Text>
+          <Text style={styles.connectLabel}>{busy ? 'CONNECTING…' : !authSupported ? 'Use web or development build' : configured ? 'Sign in with Spotify' : 'Configure Spotify sign-in'}</Text>
         </Pressable>
       )}
-      <Text style={styles.permission}>Reads your profile, top tracks, and saved music. TrackStar never receives your Spotify password.</Text>
+      <Text style={styles.permission}>{authSupported ? 'Reads your profile and music, and controls playback on your Spotify devices. TrackStar never receives your Spotify password.' : 'For Android testing, use the HTTPS web app in Chrome or create a development build with TrackStar’s callback scheme.'}</Text>
     </View>
   );
 }

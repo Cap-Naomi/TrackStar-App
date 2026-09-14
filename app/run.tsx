@@ -59,6 +59,11 @@ export default function RunScreen() {
   const progress = snapshot.totalSec > 0 ? snapshot.elapsedSec / snapshot.totalSec : 0;
   const actual = snapshot.actualSpm ?? '—';
   const accent = active ? intervalColors[active.interval.type] : colors.accent;
+  const hasTrackTempo = snapshot.trackMatch.mode !== 'unknown';
+  const usesSpotifyPlayback = snapshot.trackMatch.track.source === 'spotify' && Boolean(snapshot.trackMatch.track.spotifyUri);
+  const displayNotice = notice ?? (!hasTrackTempo
+    ? 'Spotify does not provide BPM for this track, so it is a personal pick rather than a verified beat match.'
+    : null);
 
   const confirmEnd = () => Alert.alert('End this run?', 'Your session so far will still be summarized.', [
     { text: 'Keep running', style: 'cancel' },
@@ -80,7 +85,7 @@ export default function RunScreen() {
           <Pressable onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>END</Text></Pressable>
         </View>
       </View>
-      {notice ? <View style={styles.notice}><Ionicons name="information-circle" size={16} color={colors.warning} /><Text style={styles.noticeText}>{notice}</Text></View> : null}
+      {displayNotice ? <View style={styles.notice}><Ionicons name="information-circle" size={16} color={colors.warning} /><Text style={styles.noticeText}>{displayNotice}</Text></View> : null}
 
       <View style={[styles.progressHeader, compactHeight && styles.compactProgressHeader]}>
         <View><Text style={[styles.intervalType, { color: accent }]}>{active?.interval.type.toUpperCase()}</Text><Text style={styles.intervalName}>{active?.interval.name ?? 'Finishing'}</Text></View>
@@ -89,7 +94,7 @@ export default function RunScreen() {
       <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.min(100, progress * 100)}%`, backgroundColor: accent }]} /></View>
 
       <View style={[styles.cadenceZone, compactHeight && styles.compactCadenceZone]}>
-        {snapshot.isAdjusting ? <View style={styles.adjusting}><Ionicons name="sparkles" size={13} color={colors.accentInk} /><Text style={styles.adjustingText}>ADJUSTING SOUNDTRACK</Text></View> : <View style={styles.stable}><View style={styles.stableDot} /><Text style={styles.stableText}>CADENCE LOCKED</Text></View>}
+        {snapshot.isAdjusting && hasTrackTempo ? <View style={styles.adjusting}><Ionicons name="sparkles" size={13} color={colors.accentInk} /><Text style={styles.adjustingText}>ADJUSTING SOUNDTRACK</Text></View> : <View style={styles.stable}><View style={styles.stableDot} /><Text style={styles.stableText}>{hasTrackTempo ? 'CADENCE LOCKED' : 'CADENCE TRACKING'}</Text></View>}
         <View style={[styles.cadenceRing, compactHeight && styles.compactCadenceRing, tiny && styles.tinyCadenceRing, { borderColor: accent }]}>
           <View style={[styles.cadenceInner, compactHeight && styles.compactCadenceInner, tiny && styles.tinyCadenceInner]}>
             <Text style={[styles.actual, compactHeight && styles.compactActual, tiny && styles.tinyActual]}>{actual}</Text>
@@ -99,7 +104,7 @@ export default function RunScreen() {
         <View style={styles.metricStrip}>
           <View style={styles.liveMetric}><Text style={styles.liveMetricLabel}>TARGET</Text><Text style={styles.liveMetricValue}>{active?.interval.targetSpm ?? 0}</Text></View>
           <View style={styles.metricDivider} />
-          <View style={styles.liveMetric}><Text style={styles.liveMetricLabel}>BEAT MATCH</Text><Text style={[styles.liveMetricValue, { color: snapshot.beatMatchPercent >= 75 ? colors.accent : colors.warning }]}>{snapshot.beatMatchPercent}%</Text></View>
+          <View style={styles.liveMetric}><Text style={styles.liveMetricLabel}>BEAT MATCH</Text><Text style={[styles.liveMetricValue, { color: snapshot.beatMatchPercent == null ? colors.textMuted : snapshot.beatMatchPercent >= 75 ? colors.accent : colors.warning }]}>{snapshot.beatMatchPercent == null ? '—' : `${snapshot.beatMatchPercent}%`}</Text></View>
           <View style={styles.metricDivider} />
           <View style={styles.liveMetric}><Text style={styles.liveMetricLabel}>CONFIDENCE</Text><Text style={styles.liveMetricValue}>{Math.round(snapshot.confidence * 100)}%</Text></View>
         </View>
@@ -107,15 +112,17 @@ export default function RunScreen() {
 
       <View style={[styles.nowPlaying, compact && styles.compactNowPlaying]}>
         <AlbumArt track={snapshot.trackMatch.track} size={compact ? 54 : 66} />
-        <View style={styles.songCopy}><Text style={styles.playingLabel}>PACE PICK</Text><Text numberOfLines={1} style={styles.songTitle}>{snapshot.trackMatch.track.title}</Text><Text numberOfLines={1} style={styles.artist}>{snapshot.trackMatch.track.artist}</Text></View>
-        <View style={styles.nowPlayingActions}><View style={styles.tempo}><Text style={[styles.tempoValue, compact && styles.compactTempoValue]}>{snapshot.trackMatch.mode === 'unknown' ? '♥' : Math.round(snapshot.trackMatch.effectiveTempo)}</Text><Text style={styles.tempoLabel}>{snapshot.trackMatch.mode === 'unknown' ? 'YOUR PICK' : 'BPM'}</Text></View><SpotifyButton compact url={snapshot.trackMatch.track.spotifyUrl} accessibilityLabel={`Open ${snapshot.trackMatch.track.title} on Spotify`} /></View>
+        <View style={styles.songCopy}><Text style={styles.playingLabel}>{hasTrackTempo ? 'PACE PICK' : 'SPOTIFY PICK'}</Text><Text numberOfLines={1} style={styles.songTitle}>{snapshot.trackMatch.track.title}</Text><Text numberOfLines={1} style={styles.artist}>{snapshot.trackMatch.track.artist}</Text></View>
+        <View style={styles.nowPlayingActions}><View style={styles.tempo}><Text style={[styles.tempoValue, compact && styles.compactTempoValue]}>{hasTrackTempo ? Math.round(snapshot.trackMatch.effectiveTempo) : '—'}</Text><Text style={styles.tempoLabel}>{hasTrackTempo ? 'BPM' : 'BPM UNKNOWN'}</Text></View></View>
       </View>
 
       <View style={[styles.controls, compact && styles.compactControls]}>
         <Pressable onPress={skip} style={styles.sideControl}><Ionicons name="play-skip-forward" size={23} color={colors.textPrimary} /><Text style={styles.controlLabel}>SKIP</Text></Pressable>
-        <Pressable onPress={togglePause} style={styles.pause}><Ionicons name={paused ? 'play' : 'pause'} size={32} color={colors.accentInk} /></Pressable>
+        <View style={styles.coachControl}><Pressable accessibilityLabel={paused ? `Resume ${usesSpotifyPlayback ? 'Spotify' : 'cadence beat'}` : `Pause ${usesSpotifyPlayback ? 'Spotify' : 'cadence beat'}`} onPress={togglePause} style={styles.pause}><Ionicons name={paused ? 'play' : 'pause'} size={32} color={colors.accentInk} /></Pressable><Text style={styles.controlLabel}>{usesSpotifyPlayback ? 'SPOTIFY CONNECT' : 'CADENCE BEAT'}</Text></View>
         <View style={styles.sideControl}><Ionicons name="footsteps" size={23} color={colors.textPrimary} /><Text style={styles.controlLabel}>{snapshot.points.length * 3} STEPS</Text></View>
       </View>
+
+      {snapshot.trackMatch.track.spotifyUrl ? <SpotifyButton label="OPEN FULL SONG" url={snapshot.trackMatch.track.spotifyUrl} accessibilityLabel={`Open ${snapshot.trackMatch.track.title} on Spotify`} /> : null}
 
       {source === 'simulation' ? (
         <View style={styles.demoPanel}>
@@ -197,6 +204,7 @@ const styles = StyleSheet.create({
   sideControl: { width: 58, alignItems: 'center', gap: 4 },
   controlLabel: { color: colors.textMuted, fontSize: 8, fontWeight: '900', letterSpacing: 0.7 },
   pause: { width: 62, height: 62, borderRadius: 31, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  coachControl: { alignItems: 'center', gap: 4 },
   demoPanel: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.divider, paddingHorizontal: 13, paddingVertical: 10 },
   demoHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   demoTitle: { color: colors.textPrimary, fontSize: 11, fontWeight: '800' },

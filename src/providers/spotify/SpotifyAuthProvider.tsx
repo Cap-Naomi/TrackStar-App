@@ -6,7 +6,9 @@ import {
   resolveSpotifyClientId,
   resolveSpotifyRedirectUri,
   SPOTIFY_WEB_CALLBACK_STORAGE_KEY,
+  supportsSpotifyOAuthRedirect,
 } from '@/providers/spotify/spotifyAuthConfig';
+import { hasSpotifyPlaybackScopes, SPOTIFY_SCOPES } from '@/providers/spotify/spotifyScopes';
 import { fetchSpotifyLibrary, SpotifyApiError } from '@/services/spotifyApi';
 import {
   clearSpotifyToken,
@@ -23,11 +25,11 @@ const SPOTIFY_DISCOVERY: AuthSession.DiscoveryDocument = {
   tokenEndpoint: 'https://accounts.spotify.com/api/token',
 };
 
-const SPOTIFY_SCOPES = ['user-read-private', 'user-top-read', 'user-library-read'];
 const clientId = resolveSpotifyClientId(process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID);
 
 interface SpotifyAuthContextValue {
   configured: boolean;
+  authSupported: boolean;
   redirectUri: string;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -75,6 +77,7 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
     generatedRedirectUri,
     process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI,
   );
+  const authSupported = supportsSpotifyOAuthRedirect(redirectUri);
   const setStatus = useSpotifyStore((state) => state.setStatus);
   const setConnection = useSpotifyStore((state) => state.setConnection);
   const setError = useSpotifyStore((state) => state.setError);
@@ -120,11 +123,17 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
         clear();
         return;
       }
+      if (!hasSpotifyPlaybackScopes(token.scope)) {
+        await clearSpotifyToken();
+        clear();
+        setError('Reconnect Spotify once to grant playback controls for your Spotify devices.');
+        return;
+      }
       await syncWithToken(token);
     } catch (error) {
       await handleError(error);
     }
-  }, [clear, handleError, redirectUri, syncWithToken]);
+  }, [clear, handleError, redirectUri, setError, syncWithToken]);
 
   useEffect(() => {
     if (clientId) void sync();
@@ -180,6 +189,13 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
   }, [handleAuthResponse, request]);
 
   const connect = useCallback(async () => {
+    if (!authSupported) {
+      Alert.alert(
+        'Spotify sign-in is unavailable in Expo Go',
+        'Expo Go cannot own TrackStar\'s OAuth callback. Open the TrackStar web build in Chrome, or install an Expo development build.',
+      );
+      return;
+    }
     if (!clientId) {
       Alert.alert('Spotify setup needed', `Create a Spotify developer app, set EXPO_PUBLIC_SPOTIFY_CLIENT_ID, and allowlist this exact redirect URI:\n\n${redirectUri}`);
       return;
@@ -195,7 +211,7 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
     } catch (error) {
       await handleError(error);
     }
-  }, [handleError, promptAsync, redirectUri, request, setError, setStatus]);
+  }, [authSupported, handleError, promptAsync, redirectUri, request, setError, setStatus]);
 
   const disconnect = useCallback(async () => {
     await clearSpotifyToken();
@@ -204,11 +220,12 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(() => ({
     configured: Boolean(clientId),
+    authSupported,
     redirectUri,
     connect,
     disconnect,
     sync,
-  }), [connect, disconnect, redirectUri, sync]);
+  }), [authSupported, connect, disconnect, redirectUri, sync]);
 
   return <SpotifyAuthContext.Provider value={value}>{children}</SpotifyAuthContext.Provider>;
 }

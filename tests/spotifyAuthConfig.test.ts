@@ -4,6 +4,7 @@ import {
   resolveSpotifyClientId,
   resolveSpotifyRedirectUri,
   SPOTIFY_WEB_CALLBACK_STORAGE_KEY,
+  supportsSpotifyOAuthRedirect,
 } from '@/providers/spotify/spotifyAuthConfig';
 
 describe('Spotify auth configuration', () => {
@@ -38,5 +39,11 @@ describe('Spotify auth configuration', () => {
     publishSpotifyWebCallback(callbackUrl, storage);
 
     expect(storage.setItem).toHaveBeenCalledWith(SPOTIFY_WEB_CALLBACK_STORAGE_KEY, callbackUrl);
+  });
+
+  it('rejects Expo Go redirects because the project cannot own the exp scheme', () => {
+    expect(supportsSpotifyOAuthRedirect('exp://192.168.1.5:8081/--/callback')).toBe(false);
+    expect(supportsSpotifyOAuthRedirect('trackstar-spotify://callback')).toBe(true);
+    expect(supportsSpotifyOAuthRedirect('https://trackstar.example/callback')).toBe(true);
   });
 });

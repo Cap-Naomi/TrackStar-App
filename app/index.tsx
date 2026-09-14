@@ -73,7 +73,7 @@ export default function WelcomeScreen() {
 
       <View style={styles.spotifySection}><SpotifyConnectCard /></View>
       <View style={styles.actions}><AppButton label="Build my run" icon="arrow-forward" onPress={continueToPlan} /></View>
-      <Text style={styles.privacy}><Ionicons name="lock-closed" size={11} /> Motion stays on your device. Spotify opens licensed music in Spotify; offline coaching uses bundled beat loops.</Text>
+      <Text style={styles.privacy}><Ionicons name="lock-closed" size={11} /> Motion stays on your device. Spotify playback stays in your authorized Spotify app or player.</Text>
     </Screen>
   );
 }

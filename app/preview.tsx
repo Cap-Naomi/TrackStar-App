@@ -37,7 +37,7 @@ export default function PreviewScreen() {
 
   return (
     <Screen footer={<AppButton label="Start run" icon="play" onPress={() => router.push('/run')} />}>
-      <Header eyebrow="RUN PREVIEW" title="Soundtrack ready" description={spotifyProfile ? `Built from ${spotifyProfile.displayName}'s Spotify favorites.` : 'Each track is chosen to meet your cadence without making the rhythm feel forced.'} />
+      <Header eyebrow="RUN PREVIEW" title="Soundtrack ready" description={spotifyProfile ? `Built from ${spotifyProfile.displayName}'s Spotify favorites. Spotify BPM is unavailable, so these are personal picks rather than verified tempo matches.` : 'Each track is chosen to meet your cadence without making the rhythm feel forced.'} />
 
       <View style={styles.heroCard}>
         <View style={styles.heroTop}><View style={styles.heroCopy}><Text style={styles.planName}>{activePlan.name}</Text><Text style={styles.duration}>{formatLongDuration(totalWorkoutDuration(activePlan.intervals))}</Text></View><View style={styles.ready}><FontAwesome name="spotify" size={13} color={colors.spotify} /><Text style={styles.readyText}>SPOTIFY PICKS</Text></View></View>
@@ -77,7 +77,7 @@ export default function PreviewScreen() {
           );
         })}
       </View>
-      <View style={styles.offlineNote}><Ionicons name="information-circle-outline" size={19} color={colors.cyan} /><Text style={styles.offlineCopy}>Tap the green Spotify buttons for licensed full tracks. TrackStar keeps an offline beat loop ready for cadence coaching.</Text></View>
+      <View style={styles.offlineNote}><Ionicons name="information-circle-outline" size={19} color={colors.cyan} /><Text style={styles.offlineCopy}>{spotifyProfile ? 'Open Spotify on your phone, computer, or Web Player before starting. TrackStar will control that Spotify device.' : "Without Spotify connected, the center run control plays TrackStar's bundled cadence beat."}</Text></View>
     </Screen>
   );
 }

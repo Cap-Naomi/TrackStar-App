@@ -16,7 +16,7 @@ export interface RunSessionSnapshot {
   confidence: number;
   desiredTempo: number;
   trackMatch: ScoredTrack;
-  beatMatchPercent: number;
+  beatMatchPercent: number | null;
   isAdjusting: boolean;
   points: RunDataPoint[];
 }
@@ -219,7 +219,9 @@ export class RunSessionEngine {
     const active = getActiveInterval(this.plan.intervals, this.elapsedSec);
     const nextInterval = active ? this.plan.intervals[active.index + 1] ?? null : null;
     const beatMatch =
-      this.actualSpm == null ? 0 : calculateInstantBeatMatch(this.actualSpm, this.trackMatch.effectiveTempo) * 100;
+      this.actualSpm == null || this.trackMatch.mode === 'unknown'
+        ? null
+        : calculateInstantBeatMatch(this.actualSpm, this.trackMatch.effectiveTempo) * 100;
     return {
       status: this.status,
       elapsedSec: this.elapsedSec,
@@ -230,7 +232,7 @@ export class RunSessionEngine {
       confidence: this.confidence,
       desiredTempo: this.desiredTempo,
       trackMatch: this.trackMatch,
-      beatMatchPercent: Math.round(beatMatch),
+      beatMatchPercent: beatMatch == null ? null : Math.round(beatMatch),
       isAdjusting: nowMs < this.adjustingUntilMs,
       points: [...this.points],
     };

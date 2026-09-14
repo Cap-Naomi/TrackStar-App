@@ -5,6 +5,8 @@ import { AccelerometerCadenceProvider } from '@/providers/cadence/AccelerometerC
 import type { CadenceProvider } from '@/providers/cadence/CadenceProvider';
 import { SimulatedCadenceProvider } from '@/providers/cadence/SimulatedCadenceProvider';
 import { DemoAudioPlaybackProvider } from '@/providers/playback/DemoAudioPlaybackProvider';
+import { SpotifyRemotePlaybackProvider } from '@/providers/playback/SpotifyRemotePlaybackProvider';
+import type { PlaybackProvider } from '@/providers/playback/PlaybackProvider';
 import type { CadenceSource, RunSummary, Track, WorkoutPlan } from '@/types';
 
 interface UseRunSessionInput {
@@ -22,11 +24,15 @@ export function useRunSession({ plan, source, demoMode, tracks, onComplete }: Us
   const engineRef = useRef<RunSessionEngine | null>(null);
   const cadenceRef = useRef<CadenceProvider | null>(null);
   const simulationRef = useRef<SimulatedCadenceProvider | null>(null);
-  const playbackRef = useRef<DemoAudioPlaybackProvider | null>(null);
+  const playbackRef = useRef<PlaybackProvider | null>(null);
   const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completedRef = useRef(false);
   const lastTrackIdRef = useRef<string | null>(null);
   const lastIntervalIndexRef = useRef(0);
+
+  const handlePlaybackError = useCallback((error: unknown) => {
+    setNotice(error instanceof Error ? error.message : 'Spotify playback is unavailable.');
+  }, []);
 
   const applySnapshot = useCallback((next: RunSessionSnapshot) => {
     const playback = playbackRef.current;
@@ -34,7 +40,7 @@ export function useRunSession({ plan, source, demoMode, tracks, onComplete }: Us
       lastTrackIdRef.current = next.trackMatch.track.id;
       void playback?.load(next.trackMatch.track, next.desiredTempo).then(() => {
         if (next.status === 'running') return playback.play();
-      }).catch(() => setNotice('Audio unavailable — cadence coaching is still active.'));
+      }).catch(handlePlaybackError);
     }
     if (next.active && next.active.index !== lastIntervalIndexRef.current) {
       lastIntervalIndexRef.current = next.active.index;
@@ -43,11 +49,11 @@ export function useRunSession({ plan, source, demoMode, tracks, onComplete }: Us
     setSnapshot(next);
     if ((next.status === 'completed' || next.status === 'ended') && !completedRef.current) {
       completedRef.current = true;
-      void playback?.stop();
+      void playback?.stop().catch(handlePlaybackError);
       const summary = engineRef.current?.getSummary();
       if (summary) onComplete(summary);
     }
-  }, [onComplete]);
+  }, [handlePlaybackError, onComplete]);
 
   useEffect(() => {
     let active = true;
@@ -59,7 +65,10 @@ export function useRunSession({ plan, source, demoMode, tracks, onComplete }: Us
       void (async () => {
         if (!active) return;
         const engine = new RunSessionEngine(plan, tracks, demoMode ? DEMO_SESSION_CONFIG : STANDARD_SESSION_CONFIG);
-        const playback = new DemoAudioPlaybackProvider();
+        const usesSpotify = tracks.some((track) => track.source === 'spotify' && track.spotifyUri);
+        const playback: PlaybackProvider = usesSpotify
+          ? new SpotifyRemotePlaybackProvider()
+          : new DemoAudioPlaybackProvider();
         const simulation = new SimulatedCadenceProvider();
         let cadence: CadenceProvider = simulation;
         simulationRef.current = simulation;
@@ -109,12 +118,12 @@ export function useRunSession({ plan, source, demoMode, tracks, onComplete }: Us
     const now = Date.now();
     if (snapshot.status === 'paused') {
       applySnapshot(engine.resume(now));
-      void playbackRef.current?.play();
+      void playbackRef.current?.play().catch(handlePlaybackError);
     } else {
       applySnapshot(engine.pause(now));
-      void playbackRef.current?.pause();
+      void playbackRef.current?.pause().catch(handlePlaybackError);
     }
-  }, [applySnapshot, snapshot]);
+  }, [applySnapshot, handlePlaybackError, snapshot]);
 
   const skip = useCallback(() => {
     const engine = engineRef.current;
