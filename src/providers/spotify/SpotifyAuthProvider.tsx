@@ -1,7 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import {
+  resolveSpotifyClientId,
+  resolveSpotifyRedirectUri,
+  SPOTIFY_WEB_CALLBACK_STORAGE_KEY,
+} from '@/providers/spotify/spotifyAuthConfig';
 import { fetchSpotifyLibrary, SpotifyApiError } from '@/services/spotifyApi';
 import {
   clearSpotifyToken,
@@ -19,7 +24,7 @@ const SPOTIFY_DISCOVERY: AuthSession.DiscoveryDocument = {
 };
 
 const SPOTIFY_SCOPES = ['user-read-private', 'user-top-read', 'user-library-read'];
-const clientId = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID?.trim() ?? '';
+const clientId = resolveSpotifyClientId(process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID);
 
 interface SpotifyAuthContextValue {
   configured: boolean;
@@ -61,11 +66,15 @@ async function getFreshToken(): Promise<StoredSpotifyToken | null> {
 }
 
 export function SpotifyAuthProvider({ children }: PropsWithChildren) {
-  const configuredRedirect = process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI?.trim();
-  const redirectUri = configuredRedirect || AuthSession.makeRedirectUri({
+  const generatedRedirectUri = AuthSession.makeRedirectUri({
     scheme: 'trackstar-spotify',
     path: 'callback',
   });
+  const redirectUri = resolveSpotifyRedirectUri(
+    Platform.OS,
+    generatedRedirectUri,
+    process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI,
+  );
   const setStatus = useSpotifyStore((state) => state.setStatus);
   const setConnection = useSpotifyStore((state) => state.setConnection);
   const setError = useSpotifyStore((state) => state.setError);
@@ -122,17 +131,17 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
     else setStatus(useSpotifyStore.getState().profile ? 'connected' : 'disconnected');
   }, [setStatus, sync]);
 
-  useEffect(() => {
-    if (!response || response.type === 'dismiss' || response.type === 'cancel') {
-      if (response) setStatus('disconnected');
+  const handleAuthResponse = useCallback((authResponse: AuthSession.AuthSessionResult) => {
+    if (authResponse.type === 'dismiss' || authResponse.type === 'cancel') {
+      if (!processingCode.current) setStatus('disconnected');
       return;
     }
-    if (response.type === 'error') {
-      setError(response.error?.description ?? 'Spotify authorization was denied.');
+    if (authResponse.type === 'error') {
+      setError(authResponse.error?.description ?? 'Spotify authorization was denied.');
       return;
     }
-    if (response.type !== 'success') return;
-    const code = response.params.code;
+    if (authResponse.type !== 'success') return;
+    const code = authResponse.params.code;
     if (!code || !request?.codeVerifier || processingCode.current === code) return;
     processingCode.current = code;
     void (async () => {
@@ -151,7 +160,24 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
         await handleError(error);
       }
     })();
-  }, [handleError, redirectUri, request?.codeVerifier, response, setError, setStatus, syncWithToken]);
+  }, [handleError, redirectUri, request, setError, setStatus, syncWithToken]);
+
+  useEffect(() => {
+    if (response) handleAuthResponse(response);
+  }, [handleAuthResponse, response]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !request) return;
+
+    const receiveCallback = (event: StorageEvent) => {
+      if (event.key !== SPOTIFY_WEB_CALLBACK_STORAGE_KEY || !event.newValue) return;
+      localStorage.removeItem(SPOTIFY_WEB_CALLBACK_STORAGE_KEY);
+      handleAuthResponse(request.parseReturnUrl(event.newValue));
+    };
+
+    window.addEventListener('storage', receiveCallback);
+    return () => window.removeEventListener('storage', receiveCallback);
+  }, [handleAuthResponse, request]);
 
   const connect = useCallback(async () => {
     if (!clientId) {
@@ -163,6 +189,7 @@ export function SpotifyAuthProvider({ children }: PropsWithChildren) {
       return;
     }
     try {
+      if (Platform.OS === 'web') localStorage.removeItem(SPOTIFY_WEB_CALLBACK_STORAGE_KEY);
       setStatus('connecting');
       await promptAsync();
     } catch (error) {

@@ -1,8 +1,16 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { colors } from '@/constants/colors';
+import { publishSpotifyWebCallback } from '@/providers/spotify/spotifyAuthConfig';
 
 export default function SpotifyCallbackScreen() {
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    publishSpotifyWebCallback(window.location.href, localStorage);
+    window.close();
+  }, []);
+
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
       <View style={styles.card}>

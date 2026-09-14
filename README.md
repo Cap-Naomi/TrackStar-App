@@ -17,9 +17,9 @@ Use a physical phone for real cadence detection; simulators cannot reproduce run
 
 TrackStar uses Spotify's Authorization Code with PKCE flow. No client secret belongs in the app.
 
-1. Create a Spotify Web API app in the [Spotify developer dashboard](https://developer.spotify.com/dashboard).
-2. Copy `.env.example` to `.env` and set `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`.
-3. Add `trackstar-spotify://callback` to the Spotify app's redirect URI allowlist. For a web deployment, use the exact deployed `/callback` URL and set it as `EXPO_PUBLIC_SPOTIFY_REDIRECT_URI`.
+1. The included public demo client ID works for users allowlisted on that Spotify app. To use your own app, create one in the [Spotify developer dashboard](https://developer.spotify.com/dashboard), copy `.env.example` to `.env`, and replace `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`.
+2. For native builds, add `trackstar-spotify://callback` to the Spotify app's redirect URI allowlist. Expo selects that callback automatically.
+3. For local web development, open the app at `http://127.0.0.1:8081` and allowlist `http://127.0.0.1:8081/callback`; Spotify does not accept `localhost` redirect URIs. For a deployed web app, allowlist its exact HTTPS `/callback` URL and set `EXPO_PUBLIC_SPOTIFY_REDIRECT_URI` to that URL.
 4. Create/rebuild an Expo development build after adding the native URL scheme, then start the app.
 
 Spotify development-mode apps currently require the owner to have Premium and allow up to five allowlisted users. Add each tester in the Spotify dashboard. After authorization, TrackStar stores native refresh tokens in SecureStore, fetches the user's profile, top tracks, and saved tracks, and uses that personalized catalog for soundtrack selections. Web builds use browser storage and should be served only over HTTPS.
